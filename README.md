@@ -58,6 +58,9 @@ python run.py --csv path/to/movies_clean.csv --debug
 
 Options: `--csv` (or `MOVIES_CSV`), `--database-url` (or `DATABASE_URL`), `--host`, `--port` (default `5000`), `--debug` (auto-reload).
 
+With `--debug`, Flask's reloader runs the app in a child process that restarts on every code change,
+so the CSV is loaded twice on start and again after each change. Leave it off when you don't need auto-reload.
+
 **3. Frontend** → http://localhost:5173
 
 ```bash
@@ -100,9 +103,9 @@ How text search works:
 
 - Case and accents are ignored: `amelie` finds *Amélie*.
 - **Every word** must match. How strictly depends on its length:
-  - 1–2 letters (`IX`, `1`): must appear as a **whole word**, so `IX` doesn't match inside "Nixon".
-  - 3–4 letters (`star`, `pulp`): must be **contained** as typed.
-  - 5+ letters (`matrx`, `tarantno`): contained or **similar**, so typos are tolerated.
+  - 1–2 characters (`IX`, `1`): must appear as a **whole word**, so `IX` doesn't match inside "Nixon".
+  - 3–4 characters (`star`, `pulp`): must be **contained** as typed (`%` and `_` are literal characters).
+  - 5+ characters (`matrx`, `tarantno`): contained or **similar**, so typos are tolerated.
 - With `q`, each word can match a different field.
 - Several filters combine with AND. Best matches come first, then the most voted.
 - Invalid `page`, `limit` or `year` → `400` with `{"error": "..."}`.
@@ -187,7 +190,7 @@ pytest                                                             # needs Postg
 pytest --check-routes --cov=app --cov-report=term-missing --cov-fail-under=90   # same checks as CI
 ```
 
-- Run against a separate `movies_test` database (created automatically) with `tests/movies_sample.csv`, 7 movies chosen to cover each case.
+- They run against a separate `movies_test` database (created automatically) with `tests/movies_sample.csv`, 7 movies chosen to cover each case.
 - GitHub Actions runs them on every push and pull request, and fails if a test fails,
   if any route is never called by a test, or if coverage drops below 90%.
 

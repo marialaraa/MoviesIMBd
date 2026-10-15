@@ -122,17 +122,24 @@ def test_year_filter_is_exact(client):
     assert ids(client.get("/movies?year=1999")) == [FIGHT_CLUB, MATRIX]
 
 
-def test_year_filter_must_be_a_number(client):
-    response = client.get("/movies?year=nineteen")
+@pytest.mark.parametrize("year", ["nineteen", "²"])
+def test_year_filter_must_be_a_number(client, year):
+    response = client.get("/movies", query_string={"year": year})
 
     assert response.status_code == 400
     assert response.json["error"] == "'year' must be a number"
+
+
+@pytest.mark.parametrize("title", ["___", "%%%"])
+def test_like_wildcards_are_literal(client, title):
+    assert ids(client.get("/movies", query_string={"title": title})) == []
 
 
 def test_q_searches_every_field(client):
     assert ids(client.get("/movies?q=keanu")) == [MATRIX]
     assert ids(client.get("/movies?q=amelie")) == [AMELIE]
     assert ids(client.get("/movies?q=1972")) == [GODFATHER]
+    assert ids(client.get("/movies", query_string={"q": "²"})) == []
 
 
 def test_q_words_can_match_different_fields(client):

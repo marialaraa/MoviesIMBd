@@ -23,6 +23,8 @@ services:
         source: ${MOVIES_CSV:-./IMDb_movies_clean.csv}
         target: /data/movies.csv
         read_only: true
+        bind:
+          create_host_path: false
     ports:
       - "5000:5000"
     depends_on:

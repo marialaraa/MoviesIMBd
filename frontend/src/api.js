@@ -2,7 +2,7 @@ const API_URL = "/api";
 
 async function request(path, signal) {
   const response = await fetch(`${API_URL}${path}`, { signal });
-  const body = await response.json();
+  const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(body.error ?? `Request failed (${response.status})`);
   }

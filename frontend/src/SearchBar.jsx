@@ -20,7 +20,8 @@ export default function SearchBar({ field, text, onChange }) {
       </select>
 
       <input
-        type={field === "year" ? "number" : "search"}
+        type="search"
+        inputMode={field === "year" ? "numeric" : "search"}
         value={text}
         onChange={(e) => onChange(field, e.target.value)}
         placeholder="Search movies…"

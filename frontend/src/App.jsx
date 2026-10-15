@@ -27,7 +27,9 @@ export default function App() {
           setError(null);
         })
         .catch((err) => {
-          if (err.name !== "AbortError") setError(err.message);
+          if (err.name === "AbortError") return;
+          setMovies({ total: 0, results: [] });
+          setError(err.message);
         })
         .finally(() => setLoading(false));
     }, SEARCH_DELAY_MS);

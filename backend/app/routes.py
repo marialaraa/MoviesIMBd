@@ -57,7 +57,7 @@ def list_movies():
         text = request.args.get(field, "").strip()
         if text:
             filters[field] = text
-    if "year" in filters and not filters["year"].isdigit():
+    if "year" in filters and not filters["year"].isdecimal():
         raise BadRequest("'year' must be a number")
 
     query = request.args.get("q", "").strip()

@@ -47,7 +47,7 @@ def text_match(fields, name, text):
     conditions, scores, params = [], [], {}
     for i, word in enumerate(text.split()):
         matches = [
-            word_match(field, f"{name}_{i}_{field}", word) for field in fields if field != "year" or word.isdigit()
+            word_match(field, f"{name}_{i}_{field}", word) for field in fields if field != "year" or word.isdecimal()
         ]
         conditions.append(sql.SQL("({})").format(sql.SQL(" OR ").join(m[0] for m in matches)))
         scores.append(sql.SQL("GREATEST({})").format(sql.SQL(", ").join(m[1] for m in matches)))
@@ -57,6 +57,13 @@ def text_match(fields, name, text):
     condition = sql.SQL("({})").format(sql.SQL(" AND ").join(conditions))
     score = sql.SQL("(({}) / {})").format(sql.SQL(" + ").join(scores), sql.Literal(len(scores)))
     return condition, score, params
+
+
+def parse_number(value, cast, column, movie_id):
+    if not value:
+        return None
+    assert is_valid(value, cast), f"Invalid {column}={value!r} in movie {movie_id}"
+    return cast(value)
 
 
 class MovieRepository:
@@ -94,19 +101,12 @@ class MovieRepository:
         movie = {}
         for key, value in row.items():
             if key in cls.INT_FIELDS:
-                movie[key] = cls._parse_number(value, int, key, movie_id)
+                movie[key] = parse_number(value, int, key, movie_id)
             elif key in cls.FLOAT_FIELDS:
-                movie[key] = cls._parse_number(value, float, key, movie_id)
+                movie[key] = parse_number(value, float, key, movie_id)
             else:
                 movie[key] = value or None
         return movie
-
-    @classmethod
-    def _parse_number(cls, value, cast, column, movie_id):
-        if not value:
-            return None
-        assert is_valid(value, cast), f"Invalid {column}={value!r} in movie {movie_id}"
-        return cast(value)
 
     def count(self):
         with self._pool.connection() as conn:

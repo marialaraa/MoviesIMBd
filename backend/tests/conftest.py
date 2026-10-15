@@ -3,6 +3,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from flask import request
 from psycopg import sql
 from psycopg.conninfo import make_conninfo
 
@@ -11,6 +12,35 @@ from run import DEFAULT_DATABASE_URL
 
 TEST_DATABASE = "movies_test"
 SAMPLE_CSV = Path(__file__).parent / "movies_sample.csv"
+
+ROUTES = {}
+CALLED_ENDPOINTS = set()
+UNTESTED_ROUTES = []
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--check-routes",
+        action="store_true",
+        help="fail the run if any API route was never called by the tests",
+    )
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if not session.config.getoption("--check-routes"):
+        return
+    UNTESTED_ROUTES.extend(
+        f"{rule} ({endpoint})" for endpoint, rule in sorted(ROUTES.items()) if endpoint not in CALLED_ENDPOINTS
+    )
+    if UNTESTED_ROUTES:
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
+def pytest_terminal_summary(terminalreporter):
+    if UNTESTED_ROUTES:
+        terminalreporter.section("untested routes", red=True)
+        for route in UNTESTED_ROUTES:
+            terminalreporter.write_line(f"No test calls {route}", red=True)
 
 
 @pytest.fixture(scope="session")
@@ -26,7 +56,11 @@ def database_url():
 
 @pytest.fixture(scope="session")
 def app(database_url):
-    return create_app(database_url, SAMPLE_CSV)
+    """The app under test; also records which routes the tests call, for --check-routes."""
+    app = create_app(database_url, SAMPLE_CSV)
+    ROUTES.update({rule.endpoint: rule.rule for rule in app.url_map.iter_rules() if rule.endpoint != "static"})
+    app.before_request(lambda: CALLED_ENDPOINTS.add(request.endpoint))
+    return app
 
 
 @pytest.fixture

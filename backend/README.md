@@ -1,5 +1,7 @@
 # Movies API (backend)
 
+[![Tests](https://github.com/marialaraa/MoviesIMBd/actions/workflows/tests.yml/badge.svg)](https://github.com/marialaraa/MoviesIMBd/actions/workflows/tests.yml)
+
 Read-only REST API built with Flask that serves the IMDb movies dataset from Postgres, with fuzzy search.
 On startup, the server loads the CSV into Postgres, replacing any previous data.
 
@@ -179,6 +181,22 @@ pytest
   (typo: *Matrix*, accent: *Amélie*, two Tarantino films, two from 1999, one with empty optional fields).
 - Covered: listing and ordering, pagination and its `400`s, substring / case / typo / accent matching,
   combined filters, exact `year`, `q`, `/movies/<id>` (`200` and `404`), `/health` (`200` and `503`), and that a dirty CSV stops startup.
+
+### Continuous integration
+
+GitHub Actions (`.github/workflows/tests.yml`) runs the tests on every push and pull request, against a Postgres service, and fails if:
+
+- any test fails,
+- any API route is never called by a test (`--check-routes`, defined in `tests/conftest.py`), e.g. a new endpoint pushed without tests,
+- code coverage of `app/` drops below 90% (`pytest-cov`).
+
+Run the same checks locally:
+
+```bash
+pytest --check-routes --cov=app --cov-report=term-missing --cov-fail-under=90
+```
+
+`--cov-report=term-missing` lists the line numbers no test executes.
 
 ## Design notes
 

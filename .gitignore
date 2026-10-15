@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node / React
+node_modules/
+dist/
+build/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+
+# Challenge files (not part of the solution): statement and dataset.
+# Only the root CSVs; backend/tests/movies_sample.csv is needed by the tests.
+*.pdf
+/*.csv

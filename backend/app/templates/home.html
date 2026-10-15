@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IMDb Movies API</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 640px;
+      margin: 3rem auto;
+      padding: 0 1rem;
+      color: #222;
+      line-height: 1.5;
+    }
+    h1 { margin-bottom: 0.25rem; }
+    .subtitle { color: #666; margin-top: 0; }
+    code {
+      background: #f2f2f2;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+    }
+    table { border-collapse: collapse; width: 100%; }
+    td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #eee; vertical-align: top; }
+    a { color: #0b63ce; }
+  </style>
+</head>
+<body>
+  <h1>IMDb Movies API</h1>
+  <p class="subtitle">Read-only API to list and search IMDb movies &middot; {{ "{:,}".format(movies_loaded) }} movies loaded</p>
+
+  <h2><code>GET /movies</code></h2>
+  <p>Paginated list of movies. Filters combine (all must match); typos and accents are tolerated (<code>matrx</code> finds <em>The Matrix</em>).</p>
+
+  <table>
+    <tr><td>{% for f in searchable_fields %}<code>{{ f }}</code>{{ ", " if not loop.last }}{% endfor %}</td><td>Filter by that field. <code>year</code> matches exactly</td></tr>
+    <tr><td><code>q</code></td><td>Search in all of those fields at once</td></tr>
+    <tr><td><code>page</code></td><td>Page number (default 1)</td></tr>
+    <tr><td><code>limit</code></td><td>Movies per page (default {{ default_limit }}, max {{ max_limit }})</td></tr>
+  </table>
+
+  <h3>Try it</h3>
+  <ul>
+    {% for url in examples %}
+    <li><a href="{{ url }}">{{ url }}</a></li>
+    {% endfor %}
+  </ul>
+
+  <h2><code>GET /movies/&lt;imdb_title_id&gt;</code></h2>
+  <p>A single movie, e.g. <a href="{{ url_for('movies.get_movie', movie_id='tt0133093') }}">{{ url_for('movies.get_movie', movie_id='tt0133093') }}</a>. <code>404</code> if it doesn't exist.</p>
+
+  <h2><code>GET /health</code></h2>
+  <p>Whether the API can reach the database: <a href="{{ url_for('movies.health') }}">{{ url_for('movies.health') }}</a>.</p>
+</body>
+</html>

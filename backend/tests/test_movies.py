@@ -182,13 +182,13 @@ def test_missing_csv_stops_startup(database_url, tmp_path):
         create_app(database_url, tmp_path / "missing.csv")
 
 
-def test_dirty_csv_stops_startup(database_url, tmp_path):
-    dirty_csv = tmp_path / "dirty.csv"
-    dirty_csv.write_text(
+def test_malformed_csv_stops_startup(database_url, tmp_path):
+    malformed_csv = tmp_path / "malformed.csv"
+    malformed_csv.write_text(
         "imdb_title_id,title,year\n"
         "tt8206668,Bad Education,TV Movie 2019\n",
         encoding="utf-8",
     )
 
     with pytest.raises(AssertionError, match="Invalid year='TV Movie 2019' in movie tt8206668"):
-        create_app(database_url, dirty_csv)
+        create_app(database_url, malformed_csv)

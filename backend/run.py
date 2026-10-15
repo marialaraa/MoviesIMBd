@@ -18,6 +18,7 @@ def main():
         default=os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL),
         help="Postgres connection URL (or set the DATABASE_URL environment variable)",
     )
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
@@ -27,7 +28,7 @@ def main():
 
     app = create_app(args.database_url, args.csv)
     print(f"Loaded {app.config['MOVIES'].count()} movies from {args.csv}")
-    app.run(port=args.port, debug=args.debug)
+    app.run(host=args.host, port=args.port, debug=args.debug)
 
 
 if __name__ == "__main__":

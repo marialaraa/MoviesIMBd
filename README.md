@@ -16,30 +16,49 @@ notebooks/    Dataset exploration and cleaning
 
 ## Quick start
 
-Requirements: Docker, Python 3.14, Node 22.
+**Dataset (needed by both options).** The movies CSV is not in the repo; any file with the IMDb dataset's columns works.
+Set its path in `RAW_PATH` (first cell of `notebooks/DataExploration.ipynb`) and run the notebook (Python with pandas and Jupyter):
+it corrects malformed values (e.g. `year = "TV Movie 2019"`, or integers stored as `"99.0"`) and writes a copy next to it with a `_clean` suffix (`movies.csv` → `movies_clean.csv`).
 
-**1. Dataset.** The movies CSV is not in the repo; any file with the IMDb dataset's columns works.
-Set its path in `RAW_PATH` (first cell of `notebooks/DataExploration.ipynb`) and run the notebook:
-it fixes dirty values (e.g. `year = "TV Movie 2019"`) and writes a copy next to it with a `_clean` suffix (`movies.csv` → `movies_clean.csv`).
+On every start, the backend loads that CSV into Postgres, replacing previous data.
 
-**2. Database.** From the project root:
+### Option A: Docker (run everything)
+
+Requirements: Docker. From the project root:
 
 ```bash
-docker compose up -d        # Postgres 16 on localhost:5432 (user, password and database: movies)
+MOVIES_CSV=path/to/movies_clean.csv docker compose up --build
 ```
 
-**3. Backend** → http://localhost:5000
+`MOVIES_CSV` defaults to `IMDb_movies_clean.csv` in the project root. Once the API finishes loading:
+
+- App: http://localhost:8080
+- API: http://localhost:5000
+- Postgres: `localhost:5432` (user, password and database: `movies`)
+
+Stop with `Ctrl+C`, or `docker compose down`.
+
+### Option B: Local development
+
+Requirements: Docker (only for Postgres), Python 3.14, Node 22. Code changes reload automatically.
+
+**1. Database**
+
+```bash
+docker compose up -d db
+```
+
+**2. Backend** → http://localhost:5000
 
 ```bash
 cd backend
 pip install -r requirements.txt
-python run.py --csv path/to/movies_clean.csv
+python run.py --csv path/to/movies_clean.csv --debug
 ```
 
-Options: `--csv` can also be set with `MOVIES_CSV`, `--database-url` (or `DATABASE_URL`), `--port` (default `5000`), `--debug` (auto-reload).
-On every start the CSV is loaded into Postgres, replacing previous data.
+Options: `--csv` (or `MOVIES_CSV`), `--database-url` (or `DATABASE_URL`), `--host`, `--port` (default `5000`), `--debug` (auto-reload).
 
-**4. Frontend** → http://localhost:5173
+**3. Frontend** → http://localhost:5173
 
 ```bash
 cd frontend
@@ -47,7 +66,7 @@ npm install
 npm run dev
 ```
 
-The dev server forwards `/api/*` to the backend on port 5000.
+The dev server forwards `/api/*` to the backend on port 5000; in Docker, nginx does the same.
 
 ## Frontend
 
@@ -164,7 +183,7 @@ Add `-i` to any command to see the HTTP status code, e.g. `curl -i "localhost:50
 
 ```bash
 cd backend
-pytest                                                             # needs the docker Postgres running
+pytest                                                             # needs Postgres: docker compose up -d db
 pytest --check-routes --cov=app --cov-report=term-missing --cov-fail-under=90   # same checks as CI
 ```
 
@@ -180,13 +199,14 @@ pytest --check-routes --cov=app --cov-report=term-missing --cov-fail-under=90   
   Typo tolerance is limited to words of 5+ letters: on shorter words a 0.6 similarity is reached by unrelated words
   (`wars` ≈ genre `War`), which flooded "All fields" searches with noise.
 - **Accents.** Query and fields go through `unaccent`, wrapped in an `IMMUTABLE` function so it can be indexed.
-- **Validation, not cleaning.** Cleaning lives in the notebook; the API refuses to start on dirty data instead of guessing.
+- **Validation, not cleaning.** Data cleaning lives in the notebook; the API validates the CSV and refuses to start
+  if it contains malformed values, instead of guessing how to correct them.
 - **Pagination in SQL**, since returning 85k movies at once would be tens of MB.
 - **Light lists, full details on demand.** `/movies` only returns the fields a card shows; the frontend fetches `/movies/<id>`
   when a card is opened. Searches wait 300 ms after typing stops and cancel the previous request.
 
 ## Scope: local development only
 
-Production would also need: CORS or a reverse proxy serving both apps on one domain, a WSGI server (e.g. `gunicorn`) instead of
-Flask's dev server, `--debug` off, HTTPS (TLS certificate), real database credentials, validation that doesn't rely on `assert`,
-and loading the CSV as a separate step instead of on every start.
+The Docker setup already serves both apps from one origin (nginx proxies `/api/`), so no CORS is needed.
+Production would also need: a WSGI server (e.g. `gunicorn`) instead of Flask's dev server, HTTPS (TLS certificate),
+real database credentials, validation that doesn't rely on `assert`, and loading the CSV as a separate step instead of on every start.

@@ -92,7 +92,7 @@ def test_title_filter_ignores_accents(client):
 
 
 def test_every_word_must_match(client):
-    assert ids(client.get("/movies?title=pulp fction")) == [PULP_FICTION]
+    assert ids(client.get("/movies?title=pulp fictin")) == [PULP_FICTION]
     assert ids(client.get("/movies?title=pulp fiction z")) == []
 
 
@@ -175,6 +175,11 @@ def test_health_reports_unreachable_database(app, client, monkeypatch):
 
     assert response.status_code == 503
     assert response.json == {"status": "error", "database": "unreachable"}
+
+
+def test_missing_csv_stops_startup(database_url, tmp_path):
+    with pytest.raises(FileNotFoundError, match="Movies CSV not found"):
+        create_app(database_url, tmp_path / "missing.csv")
 
 
 def test_dirty_csv_stops_startup(database_url, tmp_path):

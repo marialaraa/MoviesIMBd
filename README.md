@@ -91,7 +91,7 @@ How text search works:
 | Search | Finds | Why |
 |---|---|---|
 | `title=matrx` | *The Matrix* | typo in a word |
-| `title=pulp fction` | *Pulp Fiction* | each word matches, one with a typo |
+| `title=pulp fictin` | *Pulp Fiction* | each word matches, one with a typo |
 | `title=pulp fiction z` | nothing | there's no word `z` in the title |
 | `q=star wars ix` | *Star Wars: Episode IX* | `IX` is a whole word only in that title |
 | `q=star wars x` | nothing | no Star Wars title has the word `X` |

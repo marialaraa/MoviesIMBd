@@ -10,10 +10,10 @@ from .routes import bp
 
 def create_app(database_url, csv_path):
     app = Flask(__name__)
-    app.json.sort_keys = False  # keep the CSV column order
+    app.json.sort_keys = False
 
     pool = ConnectionPool(database_url, kwargs={"row_factory": dict_row}, open=True)
-    atexit.register(pool.close)  # close cleanly before interpreter shutdown, when its threads can still be joined
+    atexit.register(pool.close)
     movies = MovieRepository(pool)
     try:
         pool.wait(timeout=10)

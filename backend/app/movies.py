@@ -1,4 +1,5 @@
 import csv
+import re
 from pathlib import Path
 
 from psycopg import sql
@@ -7,42 +8,68 @@ from .utils import escape_like, is_valid
 
 SQL_DIR = Path(__file__).parent / "sql"
 
+WHOLE_WORD_MAX_LENGTH = 2
+MIN_FUZZY_WORD_LENGTH = 5
 
-def field_match(field, name, text):
-    """
-    SQL to match `text` against one movie field, as (condition, score, params); `name` prefixes the query params.
 
-    `year` matches exactly. Text fields ignore case and accents, and match if they contain `text`
-    (score 1) or if `text` is similar enough to some part of them, so typos still match: "matrx" -> "The Matrix"
-    (score = pg_trgm word similarity, 0.6 to 1).
-    """
+def word_match(field, name, word):
+    """Returns (condition, score, params) to match one word against one field."""
     if field == "year":
         condition = sql.SQL("year = {}").format(sql.Placeholder(name))
         score = sql.SQL("CASE WHEN {} THEN 1.0 ELSE 0.0 END").format(condition)
-        return condition, score, {name: int(text)}
+        return condition, score, {name: int(word)}
 
     column = sql.SQL("immutable_unaccent({})").format(sql.Identifier(field))
-    value = sql.SQL("immutable_unaccent({})").format(sql.Placeholder(name))
-    pattern = sql.SQL("immutable_unaccent({})").format(sql.Placeholder(f"{name}_pattern"))
 
+    if len(word) <= WHOLE_WORD_MAX_LENGTH:
+        whole_word = sql.SQL("immutable_unaccent({})").format(sql.Placeholder(f"{name}_regex"))
+        condition = sql.SQL("{} ~* {}").format(column, whole_word)
+        score = sql.SQL("CASE WHEN {} THEN 1.0 ELSE 0.0 END").format(condition)
+        return condition, score, {f"{name}_regex": rf"\m{re.escape(word)}\M"}
+
+    pattern = sql.SQL("immutable_unaccent({})").format(sql.Placeholder(f"{name}_pattern"))
     contains = sql.SQL("{} ILIKE {}").format(column, pattern)
+    params = {f"{name}_pattern": f"%{escape_like(word)}%"}
+
+    if len(word) < MIN_FUZZY_WORD_LENGTH:
+        return contains, sql.SQL("CASE WHEN {} THEN 1.0 ELSE 0.0 END").format(contains), params
+
+    value = sql.SQL("immutable_unaccent({})").format(sql.Placeholder(name))
     condition = sql.SQL("({} OR {} <%% {})").format(contains, value, column)
     score = sql.SQL("CASE WHEN {} THEN 1.0 ELSE coalesce(word_similarity({}, {}), 0) END").format(
         contains, value, column
     )
-    return condition, score, {name: text, f"{name}_pattern": f"%{escape_like(text)}%"}
+    return condition, score, {**params, name: word}
+
+
+def text_match(fields, name, text):
+    """Returns (condition, score, params) requiring every word of `text` to match one of `fields`."""
+    conditions, scores, params = [], [], {}
+    for i, word in enumerate(text.split()):
+        matches = [
+            word_match(field, f"{name}_{i}_{field}", word) for field in fields if field != "year" or word.isdigit()
+        ]
+        conditions.append(sql.SQL("({})").format(sql.SQL(" OR ").join(m[0] for m in matches)))
+        scores.append(sql.SQL("GREATEST({})").format(sql.SQL(", ").join(m[1] for m in matches)))
+        for _, _, match_params in matches:
+            params.update(match_params)
+
+    condition = sql.SQL("({})").format(sql.SQL(" AND ").join(conditions))
+    score = sql.SQL("(({}) / {})").format(sql.SQL(" + ").join(scores), sql.Literal(len(scores)))
+    return condition, score, params
 
 
 class MovieRepository:
     INT_FIELDS = {"year", "duration", "votes", "metascore"}
     FLOAT_FIELDS = {"avg_vote", "reviews_from_users", "reviews_from_critics"}
     SEARCHABLE_FIELDS = ("title", "original_title", "director", "writer", "actors", "genre", "year")
+    FILTER_FIELDS = {"title": ("title", "original_title")}
+    LIST_FIELDS = ("imdb_title_id", "title", "original_title", "year", "genre", "director", "avg_vote", "votes")
 
     def __init__(self, pool):
         self._pool = pool
 
     def load_csv(self, path):
-        """Replace the movies table with the contents of the CSV, in a single transaction."""
         path = Path(path)
         if not path.is_file():
             raise FileNotFoundError(f"Movies CSV not found: {path}")
@@ -86,37 +113,26 @@ class MovieRepository:
             return conn.execute("SELECT count(*) AS total FROM movies").fetchone()["total"]
 
     def get(self, movie_id):
-        """The movie with this IMDb id, or None."""
         with self._pool.connection() as conn:
             return conn.execute("SELECT * FROM movies WHERE imdb_title_id = %s", [movie_id]).fetchone()
 
     def ping(self, timeout):
-        """Check the database answers within `timeout` seconds; raises if it doesn't."""
         with self._pool.connection(timeout=timeout) as conn:
             conn.execute("SELECT 1")
 
     def find(self, filters, query, page, limit):
-        """
-        Movies matching every filter in `filters` ({field: text}) and, if given, `query` in any searchable field.
-
-        See `field_match` for how a single field matches. Best matches come first, then the most voted;
-        with no filters, that's simply the most voted movies.
-        """
         params, conditions, scores = {}, [], []
 
-        for field, text in filters.items():
-            condition, score, field_params = field_match(field, field, text)
+        matches = [
+            text_match(self.FILTER_FIELDS.get(field, (field,)), field, text) for field, text in filters.items()
+        ]
+        if query:
+            matches.append(text_match(self.SEARCHABLE_FIELDS, "q", query))
+
+        for condition, score, match_params in matches:
             conditions.append(condition)
             scores.append(score)
-            params.update(field_params)
-
-        if query:
-            fields = [field for field in self.SEARCHABLE_FIELDS if field != "year" or query.isdigit()]
-            matches = [field_match(field, f"q_{field}", query) for field in fields]
-            conditions.append(sql.SQL("({})").format(sql.SQL(" OR ").join(m[0] for m in matches)))
-            scores.append(sql.SQL("GREATEST({})").format(sql.SQL(", ").join(m[1] for m in matches)))
-            for _, _, field_params in matches:
-                params.update(field_params)
+            params.update(match_params)
 
         where = sql.SQL("")
         order_by = sql.SQL("votes DESC, imdb_title_id")
@@ -128,8 +144,8 @@ class MovieRepository:
 
     def _paginate(self, where, order_by, params, page, limit):
         count_query = sql.SQL("SELECT count(*) AS total FROM movies {}").format(where)
-        page_query = sql.SQL("SELECT * FROM movies {} ORDER BY {} LIMIT %(limit)s OFFSET %(offset)s").format(
-            where, order_by
+        page_query = sql.SQL("SELECT {} FROM movies {} ORDER BY {} LIMIT %(limit)s OFFSET %(offset)s").format(
+            sql.SQL(", ").join(map(sql.Identifier, self.LIST_FIELDS)), where, order_by
         )
         with self._pool.connection() as conn:
             total = conn.execute(count_query, params).fetchone()["total"]

@@ -45,7 +45,6 @@ def pytest_terminal_summary(terminalreporter):
 
 @pytest.fixture(scope="session")
 def database_url():
-    """URL of a separate test database on the same server, created if missing, so tests never touch dev data."""
     server_url = os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
     with psycopg.connect(server_url, autocommit=True) as conn:
         exists = conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", [TEST_DATABASE]).fetchone()
@@ -56,7 +55,6 @@ def database_url():
 
 @pytest.fixture(scope="session")
 def app(database_url):
-    """The app under test; also records which routes the tests call, for --check-routes."""
     app = create_app(database_url, SAMPLE_CSV)
     ROUTES.update({rule.endpoint: rule.rule for rule in app.url_map.iter_rules() if rule.endpoint != "static"})
     app.before_request(lambda: CALLED_ENDPOINTS.add(request.endpoint))

@@ -2,6 +2,7 @@ import pytest
 from psycopg_pool import PoolTimeout
 
 from app import create_app
+from app.movies import MovieRepository
 
 MATRIX = "tt0133093"
 PULP_FICTION = "tt0110912"
@@ -32,6 +33,12 @@ def test_list_without_filters_returns_every_movie_most_voted_first(client):
     assert response.status_code == 200
     assert response.json["total"] == len(ALL_BY_VOTES)
     assert ids(response) == ALL_BY_VOTES
+
+
+def test_list_returns_only_summary_fields(client):
+    movie = client.get("/movies").json["results"][0]
+
+    assert list(movie) == list(MovieRepository.LIST_FIELDS)
 
 
 def test_pagination(client):
@@ -67,6 +74,11 @@ def test_title_filter_matches_substrings(client):
     assert ids(client.get("/movies?title=god")) == [GODFATHER]
 
 
+def test_title_filter_searches_italian_and_original_titles(client):
+    assert ids(client.get("/movies?title=padrino")) == [GODFATHER]
+    assert ids(client.get("/movies?title=the godfather")) == [GODFATHER]
+
+
 def test_title_filter_ignores_case(client):
     assert ids(client.get("/movies?title=MATRIX")) == [MATRIX]
 
@@ -77,6 +89,21 @@ def test_title_filter_tolerates_typos(client):
 
 def test_title_filter_ignores_accents(client):
     assert ids(client.get("/movies?title=amelie")) == [AMELIE]
+
+
+def test_every_word_must_match(client):
+    assert ids(client.get("/movies?title=pulp fction")) == [PULP_FICTION]
+    assert ids(client.get("/movies?title=pulp fiction z")) == []
+
+
+def test_short_words_must_be_whole_words(client):
+    assert ids(client.get("/movies?title=kill bill 1")) == [KILL_BILL]
+    assert ids(client.get("/movies?title=pulp fiction p")) == []
+
+
+def test_four_letter_words_do_not_tolerate_typos(client):
+    assert ids(client.get("/movies?genre=dram")) == [FIGHT_CLUB, PULP_FICTION, GODFATHER, MINIMAL]
+    assert ids(client.get("/movies?genre=drma")) == []
 
 
 def test_filter_by_another_field_with_a_typo(client):
@@ -106,6 +133,11 @@ def test_q_searches_every_field(client):
     assert ids(client.get("/movies?q=keanu")) == [MATRIX]
     assert ids(client.get("/movies?q=amelie")) == [AMELIE]
     assert ids(client.get("/movies?q=1972")) == [GODFATHER]
+
+
+def test_q_words_can_match_different_fields(client):
+    assert ids(client.get("/movies?q=tarantino pulp")) == [PULP_FICTION]
+    assert ids(client.get("/movies?q=1999 fincher")) == [FIGHT_CLUB]
 
 
 def test_get_movie_parses_numbers_and_empty_cells(client):

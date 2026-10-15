@@ -33,7 +33,7 @@
   <p>Paginated list of movies. Filters combine (all must match); typos and accents are tolerated (<code>matrx</code> finds <em>The Matrix</em>).</p>
 
   <table>
-    <tr><td>{% for f in searchable_fields %}<code>{{ f }}</code>{{ ", " if not loop.last }}{% endfor %}</td><td>Filter by that field. <code>year</code> matches exactly</td></tr>
+    <tr><td>{% for f in searchable_fields %}<code>{{ f }}</code>{{ ", " if not loop.last }}{% endfor %}</td><td>Filter by that field. <code>title</code> also searches <code>original_title</code>; <code>year</code> matches exactly</td></tr>
     <tr><td><code>q</code></td><td>Search in all of those fields at once</td></tr>
     <tr><td><code>page</code></td><td>Page number (default 1)</td></tr>
     <tr><td><code>limit</code></td><td>Movies per page (default {{ default_limit }}, max {{ max_limit }})</td></tr>

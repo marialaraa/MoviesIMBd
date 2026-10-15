@@ -18,7 +18,6 @@ def escape_like(text):
 
 
 def positive_int(name, default):
-    """Read query parameter `name` as a positive integer, or `default` if it's missing."""
     raw = request.args.get(name)
     if raw is None:
         return default

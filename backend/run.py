@@ -1,4 +1,3 @@
-"""Entry point: python run.py --csv path/to/movies.csv"""
 import argparse
 import os
 
